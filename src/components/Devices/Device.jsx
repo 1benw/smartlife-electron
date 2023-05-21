@@ -11,7 +11,7 @@ import {
   Fab,
   Slider,
 } from '@mui/material';
-import { makeStyles } from '@mui/styles';
+import { makeStyles, useTheme } from '@mui/styles';
 import { toast } from 'react-toastify';
 
 import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
@@ -30,6 +30,7 @@ const useStyles = makeStyles((theme) => ({
 
 export default function Device({ device }) {
   const classes = useStyles();
+  const theme = useTheme();
   const [loading, setLoading] = useState(false);
 
   // Hook Methods
@@ -38,12 +39,19 @@ export default function Device({ device }) {
   const updateDeviceData = useGlobalStore(state => state.updateDeviceData);
 
   const [brightness, setBrightness] = useState(100);
+  const [colorTemp, setColorTemp] = useState(5000);
 
   useEffect(() => {
     if (device.data.brightness) {
-      setBrightness(parseInt(device.data.brightness) / 10)
+      setBrightness(parseInt(device.data.brightness) / 10);
     };
   }, [device.data.brightness]);
+
+  useEffect(() => {
+    if (device.data.color_temp) {
+      setColorTemp(((device.data.color_temp - 1000) / 4.033) + 1000);
+    };
+  }, [device.data.color_temp]);
 
   const toggleLightState = async () => {
     setLoading(true);
@@ -81,6 +89,27 @@ export default function Device({ device }) {
           online: true,
           state: "true",
           brightness: (brightness * 10).toString(),
+        });
+      }
+    } else {
+      toast.error("Failed to Send Interaction");
+    }
+
+    setLoading(false);
+  };
+
+  const changeLightColorTemp = async () => {
+    setLoading(true);
+
+    const success = await doDeviceAction(device.id, "colorTemperatureSet", "value", colorTemp);
+    if (success) {
+      const refreshed = await refreshDeviceListForced();
+
+      if (!refreshed) {
+        updateDeviceData(device.id, {
+          online: true,
+          state: "true",
+          color_temp: ((colorTemp - 1000) * 4.033) + 1000,
         });
       }
     } else {
@@ -135,6 +164,53 @@ export default function Device({ device }) {
                   disabled={loading}
                 />
               </Grid>
+              {device.data.color_temp && <Grid item xs={12} className={classes.cardActions} sx={{ padding: '0 20px' }}>
+                <Slider
+                  aria-label="Color Temp."
+                  min={1000}
+                  max={10000}
+                  value={colorTemp}
+                  onChange={e => setColorTemp(e.target.value)}
+                  onChangeCommitted={changeLightColorTemp}
+                  disabled={loading}
+                  marks={[
+                    {
+                      value: 1000,
+                      label: '2700K',
+                    },
+                    {
+                      value: 10000,
+                      label: '6500K',
+                    },
+                  ]}
+                  sx={{
+                    color: '#00000000 !important',
+                    height: '6px !important',
+                    '& .MuiSlider-track': {
+                      border: 'none',
+                    },
+                    '& .MuiSlider-thumb': {
+                      backgroundColor: theme.palette.primary.light,
+                      border: `2px solid ${theme.palette.primary.main}`,
+                      '&:focus, &:hover, &.Mui-active, &.Mui-focusVisible': {
+                        boxShadow: 'inherit',
+                      },
+                      '&:before': {
+                        display: 'none',
+                      },
+                    },
+                    '& .MuiSlider-markLabel': {
+                      color: theme.palette.text.secondary,
+                    },
+                    '& .MuiSlider-markLabelActive': {
+                      color: theme.palette.text.secondary,
+                    },
+                    '& .MuiSlider-rail': {
+                      background: 'linear-gradient(0.25turn, #f69d3c, #ebf8e1, #3f87a6)',
+                    },
+                  }}
+                />
+              </Grid>}
             </Grid>
           </CardActions>
         );
